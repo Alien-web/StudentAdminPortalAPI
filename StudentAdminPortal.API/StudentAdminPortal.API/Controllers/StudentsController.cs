@@ -1,10 +1,12 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using StudentAdminPortal.API.DataModels;
 using StudentAdminPortal.API.DomainModels;
 using StudentAdminPortal.API.Repositories;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -16,11 +18,13 @@ namespace StudentAdminPortal.API.Controllers
     {
        
         private readonly IStudentRepository studentRepository;
+        private readonly IImageRepository imageRepository;
         private readonly IMapper mapper;
 
-        public StudentsController(IStudentRepository studentRepository,IMapper mapper)
+        public StudentsController(IStudentRepository studentRepository, IImageRepository imageRepository, IMapper mapper)
         {
             this.studentRepository = studentRepository;
+            this.imageRepository = imageRepository;
             this.mapper = mapper;
         }
 
@@ -85,6 +89,26 @@ namespace StudentAdminPortal.API.Controllers
             var createdStudent =await studentRepository.AddStudent(mapper.Map<Students>(request));
             return CreatedAtAction(nameof(GetStudentAsync), new { studentId = createdStudent.id },
                 mapper.Map<Student>(createdStudent));
+        }
+
+        [HttpPost]
+        [Route("[controller]/{id}/upload-image")]
+        public async Task<IActionResult> UploadImageAsync([FromRoute] Guid Id, IFormFile profileImage)
+        {
+            if (await studentRepository.Exists(Id))
+            {
+                var fileName = Guid.NewGuid() + Path.GetExtension(profileImage.FileName);
+                var fileImagePath=await imageRepository.UploadImage(profileImage, fileName);
+                if(await studentRepository.UploadImage(Id, fileImagePath))
+                {
+                    return Ok(fileImagePath);
+                }
+                return StatusCode(StatusCodes.Status500InternalServerError, "Error uploading image");
+            }
+            else
+            {
+                return NotFound();
+            }
         }
     }
 
